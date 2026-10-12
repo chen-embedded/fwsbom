@@ -1,0 +1,37 @@
+name: fwsbom
+description: Generate a CycloneDX SBOM for bare-metal / RTOS C firmware, verified against the linker map
+branding:
+  icon: cpu
+  color: blue
+inputs:
+  root:
+    description: Firmware project root
+    default: "."
+  map:
+    description: Linker map file (enables linked-only filtering)
+    default: ""
+  name:
+    description: Firmware name
+    default: ${{ github.event.repository.name }}
+  version:
+    description: Firmware version
+    default: ${{ github.ref_name }}
+  supplier:
+    description: Your company name
+    default: ${{ github.repository_owner }}
+  output:
+    description: SBOM output path
+    default: sbom.cdx.json
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - shell: bash
+      run: |
+        pip install "${{ github.action_path }}"
+        args=("${{ inputs.root }}" --name "${{ inputs.name }}" --version "${{ inputs.version }}" \
+              --supplier "${{ inputs.supplier }}" -o "${{ inputs.output }}")
+        if [ -n "${{ inputs.map }}" ]; then args+=(--map "${{ inputs.map }}" --linked-only); fi
+        fwsbom "${args[@]}"

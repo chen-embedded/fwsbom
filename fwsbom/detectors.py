@@ -1,0 +1,217 @@
+"""Detect vendored third-party components in a C/C++ firmware source tree.
+
+Each detector names a "marker" file that identifies the component and a list of
+regexes that pull the version out of that file. Embedded projects rarely use a
+package manager, so the version string inside the vendored headers is usually
+the only reliable source of truth.
+"""
+import os
+import re
+from dataclasses import dataclass, field
+from typing import Callable, List, Optional
+
+SKIP_DIRS = {".git", ".svn", "build", "Debug", "Release", "node_modules", "__pycache__", ".venv"}
+
+
+@dataclass
+class Component:
+    name: str
+    version: str
+    supplier: str
+    root: str
+    license: Optional[str] = None
+    purl: Optional[str] = None
+    cpe: Optional[str] = None
+    linked: Optional[bool] = None  # None = unknown (no map file supplied)
+    evidence: List[str] = field(default_factory=list)
+
+
+@dataclass
+class Detector:
+    name: str
+    supplier: str
+    marker: str  # file name that identifies the component
+    parse: Callable[[str], Optional[str]]  # file text -> version
+    root_levels: int = 1  # how many dirs above the marker is the component root
+    license: Optional[str] = None
+    purl: Optional[str] = None  # format string with {v}
+    cpe: Optional[str] = None  # format string with {v}
+    path_hint: Optional[str] = None  # substring the marker path must contain
+
+
+def _define(text, name):
+    m = re.search(r"#\s*define\s+" + re.escape(name) + r"\s+\(?\s*([^\s)/]+)", text)
+    return m.group(1).strip('"').rstrip("UuLl") if m else None
+
+
+def _join_defines(*names, prefix=""):
+    def parse(text):
+        parts = [_define(text, n) for n in names]
+        if any(p is None for p in parts):
+            return None
+        return prefix + ".".join(str(int(p, 0)) for p in parts)
+    return parse
+
+
+def _string_define(name, strip_prefix=""):
+    def parse(text):
+        v = _define(text, name)
+        if v and strip_prefix and v.startswith(strip_prefix):
+            v = v[len(strip_prefix):]
+        return v
+    return parse
+
+
+def _regex(pattern):
+    def parse(text):
+        m = re.search(pattern, text)
+        return m.group(1) if m else None
+    return parse
+
+
+def _littlefs(text):
+    v = _define(text, "LFS_VERSION")
+    if not v:
+        return None
+    n = int(v, 0)
+    return "{}.{}".format(n >> 16, n & 0xFFFF)
+
+
+def _stm32_hal(text):
+    m = re.search(r"#\s*define\s+__(STM32\w+?)_HAL_VERSION_MAIN\s+\(?\s*(0x[0-9A-Fa-f]+|\d+)", text)
+    if not m:
+        return None
+    family = m.group(1)
+    parts = []
+    for part in ("MAIN", "SUB1", "SUB2"):
+        v = _define(text, "__{}_HAL_VERSION_{}".format(family, part))
+        if v is None:
+            return None
+        parts.append(str(int(v, 0)))
+    return "{}:{}".format(family, ".".join(parts))
+
+
+DETECTORS = [
+    Detector("FreeRTOS-Kernel", "Amazon / FreeRTOS", "task.h",
+             _string_define("tskKERNEL_VERSION_NUMBER", "V"),
+             root_levels=2, license="MIT",
+             purl="pkg:github/FreeRTOS/FreeRTOS-Kernel@V{v}"),
+    Detector("Mbed TLS", "Arm / TrustedFirmware.org", "build_info.h",
+             _string_define("MBEDTLS_VERSION_STRING"),
+             root_levels=3, license="Apache-2.0 OR GPL-2.0-or-later",
+             purl="pkg:github/Mbed-TLS/mbedtls@v{v}", cpe="cpe:2.3:a:arm:mbed_tls:{v}:*:*:*:*:*:*:*",
+             path_hint="mbedtls"),
+    Detector("Mbed TLS", "Arm / TrustedFirmware.org", "version.h",  # Mbed TLS 2.x
+             _string_define("MBEDTLS_VERSION_STRING"),
+             root_levels=3, license="Apache-2.0",
+             purl="pkg:github/Mbed-TLS/mbedtls@v{v}", cpe="cpe:2.3:a:arm:mbed_tls:{v}:*:*:*:*:*:*:*",
+             path_hint="mbedtls"),
+    Detector("lwIP", "lwIP project", "init.h",
+             _join_defines("LWIP_VERSION_MAJOR", "LWIP_VERSION_MINOR", "LWIP_VERSION_REVISION"),
+             root_levels=4, license="BSD-3-Clause",
+             purl="pkg:generic/lwip@{v}", cpe="cpe:2.3:a:lwip_project:lwip:{v}:*:*:*:*:*:*:*",
+             path_hint="lwip"),
+    Detector("FatFs", "ChaN", "ff.h", _regex(r"FatFs[^\n]*?\b(R\d+\.\d+[a-z]?)"),
+             root_levels=1, license="FatFs (BSD-1-Clause-style)",
+             purl="pkg:generic/fatfs@{v}"),
+    Detector("littlefs", "littlefs-project", "lfs.h", _littlefs,
+             root_levels=1, license="BSD-3-Clause",
+             purl="pkg:github/littlefs-project/littlefs@v{v}"),
+    Detector("wolfSSL", "wolfSSL Inc.", "version.h", _string_define("LIBWOLFSSL_VERSION_STRING"),
+             root_levels=2, license="GPL-2.0-or-later OR commercial",
+             purl="pkg:github/wolfSSL/wolfssl@v{v}-stable", cpe="cpe:2.3:a:wolfssl:wolfssl:{v}:*:*:*:*:*:*:*",
+             path_hint="wolfssl"),
+    Detector("TinyUSB", "hathach / TinyUSB", "tusb_option.h",
+             _join_defines("TUSB_VERSION_MAJOR", "TUSB_VERSION_MINOR", "TUSB_VERSION_REVISION"),
+             root_levels=2, license="MIT",
+             purl="pkg:github/hathach/tinyusb@{v}"),
+    Detector("cJSON", "Dave Gamble", "cJSON.h",
+             _join_defines("CJSON_VERSION_MAJOR", "CJSON_VERSION_MINOR", "CJSON_VERSION_PATCH"),
+             root_levels=1, license="MIT",
+             purl="pkg:github/DaveGamble/cJSON@v{v}", cpe="cpe:2.3:a:cjson_project:cjson:{v}:*:*:*:*:*:*:*"),
+    Detector("nanopb", "Petteri Aimonen", "pb.h", _regex(r"#define\s+NANOPB_VERSION\s+\"?nanopb-([\w.\-]+)\"?"),
+             root_levels=1, license="Zlib",
+             purl="pkg:github/nanopb/nanopb@{v}"),
+    Detector("CMSIS-Core", "Arm", "cmsis_version.h",
+             _join_defines("__CM_CMSIS_VERSION_MAIN", "__CM_CMSIS_VERSION_SUB"),
+             root_levels=2, license="Apache-2.0",
+             purl="pkg:github/ARM-software/CMSIS_5@{v}"),
+]
+
+
+def _stm32_hal_detectors():
+    # HAL version lives in e.g. Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c
+    return Detector("STM32Cube HAL", "STMicroelectronics", "", _stm32_hal,
+                    root_levels=2, license="BSD-3-Clause")
+
+
+def _iter_files(root):
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        for f in filenames:
+            yield dirpath, f
+
+
+def _read(path):
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            return fh.read(200_000)
+    except OSError:
+        return ""
+
+
+def _up(path, levels):
+    for _ in range(levels):
+        path = os.path.dirname(path)
+    return path
+
+
+def detect(root: str) -> List[Component]:
+    by_marker = {}
+    for d in DETECTORS:
+        by_marker.setdefault(d.marker, []).append(d)
+    hal = _stm32_hal_detectors()
+    hal_re = re.compile(r"^stm32\w+_hal\.c$", re.IGNORECASE)
+
+    found = {}
+    for dirpath, fname in _iter_files(root):
+        path = os.path.join(dirpath, fname)
+        candidates = list(by_marker.get(fname, []))
+        if hal_re.match(fname):
+            candidates.append(hal)
+        if not candidates:
+            continue
+        text = None
+        for d in candidates:
+            if d.path_hint and d.path_hint not in path.replace("\\", "/").lower():
+                continue
+            if text is None:
+                text = _read(path)
+            version = d.parse(text)
+            if not version:
+                continue
+            name = d.name
+            if d is hal:
+                family, version = version.split(":", 1)
+                name = "{} HAL Driver".format(family)
+            comp_root = os.path.normpath(_up(path, d.root_levels))
+            key = (name, version, comp_root)
+            if key in found:
+                continue
+            found[key] = Component(
+                name=name, version=version, supplier=d.supplier, root=comp_root,
+                license=d.license,
+                purl=d.purl.format(v=version) if d.purl else
+                "pkg:generic/{}@{}".format(name.lower().replace(" ", "-"), version),
+                cpe=d.cpe.format(v=version) if d.cpe else None,
+                evidence=[os.path.relpath(path, root).replace("\\", "/")],
+            )
+            break
+    # A component nested inside another copy of itself (e.g. packaging mirrors) is one component.
+    comps = sorted(found.values(), key=lambda c: len(c.root))
+    kept = []
+    for c in comps:
+        if not any(k.name == c.name and k.version == c.version
+                   and os.path.commonpath([k.root, c.root]) == k.root for k in kept):
+            kept.append(c)
+    return sorted(kept, key=lambda c: (c.name.lower(), c.version))

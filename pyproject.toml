@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fwsbom"
+version = "0.1.0"
+description = "CycloneDX SBOMs for bare-metal and RTOS C firmware, verified against the linker map"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "Apache-2.0"}
+authors = [{name = "Chen Embedded Software"}]
+keywords = ["sbom", "cyclonedx", "firmware", "embedded", "stm32", "freertos", "cyber-resilience-act"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Embedded Systems",
+    "Topic :: Security",
+]
+
+[project.scripts]
+fwsbom = "fwsbom.cli:main"
+
+[tool.setuptools]
+packages = ["fwsbom"]
