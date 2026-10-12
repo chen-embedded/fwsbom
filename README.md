@@ -29,7 +29,7 @@ for vulnerability monitoring.
 ## Install
 
 ```
-pip install fwsbom        # or: pip install git+https://github.com/<org>/fwsbom
+pip install git+https://github.com/chen-embedded/fwsbom   # PyPI release coming soon
 ```
 
 Requires Python 3.8+ and has no dependencies.
@@ -63,7 +63,7 @@ Missing a library you use? Open an issue. Adding a detector takes about 5 lines.
 - **Fixed-price firmware CRA assessment**: we review your firmware, secure boot,
   update mechanism and SBOM, and deliver a gap report with fixes.
 
-Contact: `<business email>`
+Contact: open a [discussion](https://github.com/chen-embedded/fwsbom/discussions) or an issue. A business email is coming soon.
 
 ## License
 
