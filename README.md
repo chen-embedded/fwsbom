@@ -41,6 +41,10 @@ pip install git+https://github.com/chen-embedded/fwsbom   # PyPI release coming 
 
 Requires Python 3.8+ and has no dependencies.
 
+**Windows:** if `fwsbom` is "not recognized" after installing (common with the Microsoft Store Python,
+whose scripts folder isn't on PATH), run it as **`python -m fwsbom ...`**. It's the same tool.
+Install Grype with **`winget install Anchore.Grype`**, then open a new terminal.
+
 ## Detected components
 
 FreeRTOS-Kernel · Mbed TLS (2.x/3.x/4.x) · lwIP · FatFs · littlefs · wolfSSL · TinyUSB ·
