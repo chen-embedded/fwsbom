@@ -70,7 +70,7 @@ Missing a library you use? Open an issue. Adding a detector takes about 5 lines.
 - **Fixed-price firmware CRA assessment**: we review your firmware, secure boot,
   update mechanism and SBOM, and deliver a gap report with fixes.
 
-Contact: open a [discussion](https://github.com/chen-embedded/fwsbom/discussions) or an issue. A business email is coming soon.
+Contact: **chenembeddedsoftware@gmail.com** (or open an issue for bugs and feature requests)
 
 ## License
 
