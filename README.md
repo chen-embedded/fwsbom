@@ -31,7 +31,7 @@ $ fwsbom . -o sbom.cdx.json && grype sbom:sbom.cdx.json
 ```
 
 CPEs are checked against the NVD product dictionary. Products filed under several vendors
-(e.g. Mbed TLS: `arm` and `trustedfirmware`) get all of their CPEs, so nothing is missed.
+(e.g. Mbed TLS: `arm` and `trustedfirmware`) get all of their CPEs, so matches are not lost to vendor naming.
 
 ## Install
 
