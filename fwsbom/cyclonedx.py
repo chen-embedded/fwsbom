@@ -22,8 +22,10 @@ def render(components: List[Component], product: str, product_version: str, supp
         if c.license:
             entry["licenses"] = [{"expression": c.license}] if " OR " in c.license or "(" in c.license \
                 else [{"license": {"id": c.license}}]
-        if c.cpe:
-            entry["cpe"] = c.cpe
+        if c.cpes:
+            # Extra CPEs go in the property Syft/Grype read for alternate identifiers.
+            entry["cpe"] = c.cpes[0]
+            entry["properties"] += [{"name": "syft:cpe23", "value": x} for x in c.cpes[1:]]
         if c.linked is not None:
             entry["properties"].append({"name": "fwsbom:linked", "value": str(c.linked).lower()})
         comps.append(entry)

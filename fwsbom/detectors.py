@@ -8,7 +8,7 @@ the only reliable source of truth.
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 SKIP_DIRS = {".git", ".svn", "build", "Debug", "Release", "node_modules", "__pycache__", ".venv"}
 
@@ -21,7 +21,7 @@ class Component:
     root: str
     license: Optional[str] = None
     purl: Optional[str] = None
-    cpe: Optional[str] = None
+    cpes: List[str] = field(default_factory=list)  # first is primary
     linked: Optional[bool] = None  # None = unknown (no map file supplied)
     evidence: List[str] = field(default_factory=list)
 
@@ -35,7 +35,7 @@ class Detector:
     root_levels: int = 1  # how many dirs above the marker is the component root
     license: Optional[str] = None
     purl: Optional[str] = None  # format string with {v}
-    cpe: Optional[str] = None  # format string with {v}
+    cpe: Tuple[str, ...] = ()  # format strings with {v} (version) / {vl} (lowercase version)
     path_hint: Optional[str] = None  # substring the marker path must contain
 
 
@@ -91,35 +91,39 @@ def _stm32_hal(text):
     return "{}:{}".format(family, ".".join(parts))
 
 
+# NVD files older Mbed TLS CVEs under arm, newer ones under trustedfirmware.
+_MBEDTLS_CPES = ("cpe:2.3:a:arm:mbed_tls:{v}:*:*:*:*:*:*:*",
+                 "cpe:2.3:a:trustedfirmware:mbed_tls:{v}:*:*:*:*:*:*:*")
+
 DETECTORS = [
     Detector("FreeRTOS-Kernel", "Amazon / FreeRTOS", "task.h",
              _string_define("tskKERNEL_VERSION_NUMBER", "V"),
              root_levels=2, license="MIT",
-             purl="pkg:github/FreeRTOS/FreeRTOS-Kernel@V{v}"),
+             purl="pkg:github/FreeRTOS/FreeRTOS-Kernel@V{v}", cpe=("cpe:2.3:o:amazon:freertos:{v}:*:*:*:*:*:*:*",)),
     Detector("Mbed TLS", "Arm / TrustedFirmware.org", "build_info.h",
              _string_define("MBEDTLS_VERSION_STRING"),
              root_levels=3, license="Apache-2.0 OR GPL-2.0-or-later",
-             purl="pkg:github/Mbed-TLS/mbedtls@v{v}", cpe="cpe:2.3:a:arm:mbed_tls:{v}:*:*:*:*:*:*:*",
+             purl="pkg:github/Mbed-TLS/mbedtls@v{v}", cpe=_MBEDTLS_CPES,
              path_hint="mbedtls"),
     Detector("Mbed TLS", "Arm / TrustedFirmware.org", "version.h",  # Mbed TLS 2.x
              _string_define("MBEDTLS_VERSION_STRING"),
              root_levels=3, license="Apache-2.0",
-             purl="pkg:github/Mbed-TLS/mbedtls@v{v}", cpe="cpe:2.3:a:arm:mbed_tls:{v}:*:*:*:*:*:*:*",
+             purl="pkg:github/Mbed-TLS/mbedtls@v{v}", cpe=_MBEDTLS_CPES,
              path_hint="mbedtls"),
     Detector("lwIP", "lwIP project", "init.h",
              _join_defines("LWIP_VERSION_MAJOR", "LWIP_VERSION_MINOR", "LWIP_VERSION_REVISION"),
              root_levels=4, license="BSD-3-Clause",
-             purl="pkg:generic/lwip@{v}", cpe="cpe:2.3:a:lwip_project:lwip:{v}:*:*:*:*:*:*:*",
+             purl="pkg:generic/lwip@{v}", cpe=("cpe:2.3:a:lwip_project:lwip:{v}:*:*:*:*:*:*:*",),
              path_hint="lwip"),
     Detector("FatFs", "ChaN", "ff.h", _regex(r"FatFs[^\n]*?\b(R\d+\.\d+[a-z]?)"),
              root_levels=1, license="FatFs (BSD-1-Clause-style)",
-             purl="pkg:generic/fatfs@{v}"),
+             purl="pkg:generic/fatfs@{v}", cpe=("cpe:2.3:a:elm-chan:fatfs:{vl}:*:*:*:*:*:*:*",)),
     Detector("littlefs", "littlefs-project", "lfs.h", _littlefs,
              root_levels=1, license="BSD-3-Clause",
              purl="pkg:github/littlefs-project/littlefs@v{v}"),
     Detector("wolfSSL", "wolfSSL Inc.", "version.h", _string_define("LIBWOLFSSL_VERSION_STRING"),
              root_levels=2, license="GPL-2.0-or-later OR commercial",
-             purl="pkg:github/wolfSSL/wolfssl@v{v}-stable", cpe="cpe:2.3:a:wolfssl:wolfssl:{v}:*:*:*:*:*:*:*",
+             purl="pkg:github/wolfSSL/wolfssl@v{v}-stable", cpe=("cpe:2.3:a:wolfssl:wolfssl:{v}:*:*:*:*:*:*:*",),
              path_hint="wolfssl"),
     Detector("TinyUSB", "hathach / TinyUSB", "tusb_option.h",
              _join_defines("TUSB_VERSION_MAJOR", "TUSB_VERSION_MINOR", "TUSB_VERSION_REVISION"),
@@ -128,10 +132,11 @@ DETECTORS = [
     Detector("cJSON", "Dave Gamble", "cJSON.h",
              _join_defines("CJSON_VERSION_MAJOR", "CJSON_VERSION_MINOR", "CJSON_VERSION_PATCH"),
              root_levels=1, license="MIT",
-             purl="pkg:github/DaveGamble/cJSON@v{v}", cpe="cpe:2.3:a:cjson_project:cjson:{v}:*:*:*:*:*:*:*"),
+             purl="pkg:github/DaveGamble/cJSON@v{v}", cpe=("cpe:2.3:a:cjson_project:cjson:{v}:*:*:*:*:*:*:*",
+                                                  "cpe:2.3:a:davegamble:cjson:{v}:*:*:*:*:*:*:*")),
     Detector("nanopb", "Petteri Aimonen", "pb.h", _regex(r"#define\s+NANOPB_VERSION\s+\"?nanopb-([\w.\-]+)\"?"),
              root_levels=1, license="Zlib",
-             purl="pkg:github/nanopb/nanopb@{v}"),
+             purl="pkg:github/nanopb/nanopb@{v}", cpe=("cpe:2.3:a:nanopb_project:nanopb:{v}:*:*:*:*:*:*:*",)),
     Detector("CMSIS-Core", "Arm", "cmsis_version.h",
              _join_defines("__CM_CMSIS_VERSION_MAIN", "__CM_CMSIS_VERSION_SUB"),
              root_levels=2, license="Apache-2.0",
@@ -203,7 +208,7 @@ def detect(root: str) -> List[Component]:
                 license=d.license,
                 purl=d.purl.format(v=version) if d.purl else
                 "pkg:generic/{}@{}".format(name.lower().replace(" ", "-"), version),
-                cpe=d.cpe.format(v=version) if d.cpe else None,
+                cpes=[c.format(v=version, vl=version.lower()) for c in d.cpe],
                 evidence=[os.path.relpath(path, root).replace("\\", "/")],
             )
             break

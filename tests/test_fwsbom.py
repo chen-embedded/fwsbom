@@ -110,8 +110,16 @@ class FwsbomTest(unittest.TestCase):
         mbed = next(c for c in bom["components"] if c["name"] == "Mbed TLS")
         self.assertEqual(mbed["cpe"], "cpe:2.3:a:arm:mbed_tls:3.6.2:*:*:*:*:*:*:*")
         self.assertEqual(mbed["purl"], "pkg:github/Mbed-TLS/mbedtls@v3.6.2")
+        self.assertIn({"name": "syft:cpe23", "value": "cpe:2.3:a:trustedfirmware:mbed_tls:3.6.2:*:*:*:*:*:*:*"},
+                      mbed["properties"])
+        rtos = next(c for c in bom["components"] if c["name"] == "FreeRTOS-Kernel")
+        self.assertEqual(rtos["cpe"], "cpe:2.3:o:amazon:freertos:10.6.2:*:*:*:*:*:*:*")
         refs = {c["bom-ref"] for c in bom["components"]}
         self.assertEqual(set(bom["dependencies"][0]["dependsOn"]), refs)
+
+    def test_fatfs_cpe_lowercase(self):
+        fatfs = next(c for c in detectors.detect(self.root) if c.name == "FatFs")
+        self.assertEqual(fatfs.cpes, ["cpe:2.3:a:elm-chan:fatfs:r0.15:*:*:*:*:*:*:*"])
 
 
 if __name__ == "__main__":

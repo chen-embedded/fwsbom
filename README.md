@@ -24,7 +24,14 @@ STM32F4xx HAL Driver         1.8.3          yes     Drivers/STM32F4xx_HAL_Driver
 
 The output is CycloneDX 1.5 JSON. Each component carries a purl, and a CPE where NVD
 has one, so the SBOM can be fed straight into Dependency-Track, OSV-Scanner or Grype
-for vulnerability monitoring.
+for vulnerability monitoring:
+
+```
+$ fwsbom . -o sbom.cdx.json && grype sbom:sbom.cdx.json
+```
+
+CPEs are checked against the NVD product dictionary. Products filed under several vendors
+(e.g. Mbed TLS: `arm` and `trustedfirmware`) get all of their CPEs, so nothing is missed.
 
 ## Install
 
