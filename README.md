@@ -63,15 +63,15 @@ Missing a library you use? Open an issue. Adding a detector takes about 5 lines.
 
 ## Need help getting CRA-ready?
 
-`fwsbom` is free and Apache-2.0. Chen Embedded Software also offers:
+`fwsbom` is free and Apache-2.0. Chen Embedded Software LLC also offers:
 
 - **CRA Firmware Readiness Kit**: policy templates, vulnerability-handling process,
   ENISA report templates and a CI pipeline that regenerates and monitors your SBOM.
-- **Fixed-price firmware CRA assessment**: we review your firmware, secure boot,
-  update mechanism and SBOM, and deliver a gap report with fixes.
+- **Firmware CRA assessment** (waitlist): a fixed-price review of your firmware, secure boot,
+  update mechanism and SBOM, with a prioritised gap report.
 
 Contact: **chenembeddedsoftware@gmail.com** (or open an issue for bugs and feature requests)
 
 ## License
 
-Apache-2.0 © Chen Embedded Software
+Apache-2.0 © 2026 Chen Embedded Software LLC

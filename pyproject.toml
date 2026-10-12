@@ -9,7 +9,7 @@ description = "CycloneDX SBOMs for bare-metal and RTOS C firmware, verified agai
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "Apache-2.0"}
-authors = [{name = "Chen Embedded Software"}]
+authors = [{name = "Chen Embedded Software LLC"}]
 keywords = ["sbom", "cyclonedx", "firmware", "embedded", "stm32", "freertos", "cyber-resilience-act"]
 classifiers = [
     "Programming Language :: Python :: 3",

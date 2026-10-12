@@ -38,7 +38,7 @@ def render(components: List[Component], product: str, product_version: str, supp
         "metadata": {
             "timestamp": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
             "tools": {"components": [{"type": "application", "name": "fwsbom", "version": __version__,
-                                      "supplier": {"name": "Chen Embedded Software"}}]},
+                                      "supplier": {"name": "Chen Embedded Software LLC"}}]},
             "component": {"bom-ref": "root-firmware", "type": "firmware", "name": product, "version": product_version,
                           "supplier": {"name": supplier}},
         },
