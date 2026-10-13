@@ -23,6 +23,7 @@ class Component:
     purl: Optional[str] = None
     cpes: List[str] = field(default_factory=list)  # first is primary
     linked: Optional[bool] = None  # None = unknown (no map file supplied)
+    linkable: bool = True  # False for SDK/package-level entries (e.g. STM32Cube package from .ioc)
     evidence: List[str] = field(default_factory=list)
 
 
@@ -75,6 +76,21 @@ def _littlefs(text):
         return None
     n = int(v, 0)
     return "{}.{}".format(n >> 16, n & 0xFFFF)
+
+
+def _mcuboot(text):
+    parts = [re.search(r"^%s\s*=\s*(\d+)" % k, text, re.M) for k in ("VERSION_MAJOR", "VERSION_MINOR", "PATCHLEVEL")]
+    if not all(parts):
+        return None
+    v = ".".join(m.group(1) for m in parts)
+    extra = re.search(r"^EXTRAVERSION[ \t]*=[ \t]*(\S+)", text, re.M)
+    return v + ("-" + extra.group(1) if extra else "")
+
+
+def _st_release_notes(text):
+    # ST release notes list the newest version first, e.g. "V2.11.6"
+    m = re.search(r"\bV(\d+\.\d+\.\d+)\b", text)
+    return m.group(1) if m else None
 
 
 def _stm32_hal(text):
@@ -141,7 +157,49 @@ DETECTORS = [
              _join_defines("__CM_CMSIS_VERSION_MAIN", "__CM_CMSIS_VERSION_SUB"),
              root_levels=2, license="Apache-2.0",
              purl="pkg:github/ARM-software/CMSIS_5@{v}"),
+    Detector("FreeRTOS-Plus-TCP", "Amazon / FreeRTOS", "FreeRTOS_IP.h",
+             _string_define("ipFR_TCP_VERSION_NUMBER", "V"),
+             root_levels=3, license="MIT",
+             purl="pkg:github/FreeRTOS/FreeRTOS-Plus-TCP@V{v}",
+             cpe=("cpe:2.3:a:amazon:freertos-plus-tcp:{v}:*:*:*:*:*:*:*",)),
+    Detector("coreMQTT", "Amazon / FreeRTOS", "core_mqtt.h",
+             _string_define("MQTT_LIBRARY_VERSION", "v"),
+             root_levels=3, license="MIT",
+             purl="pkg:github/FreeRTOS/coreMQTT@v{v}"),
+    Detector("Eclipse ThreadX", "Eclipse Foundation (formerly Azure RTOS)", "tx_api.h",
+             _join_defines("THREADX_MAJOR_VERSION", "THREADX_MINOR_VERSION", "THREADX_PATCH_VERSION"),
+             root_levels=3, license="MIT",
+             purl="pkg:github/eclipse-threadx/threadx@v{v}",
+             cpe=("cpe:2.3:a:eclipse:threadx:{v}:*:*:*:*:*:*:*",
+                  "cpe:2.3:o:microsoft:azure_rtos_threadx:{v}:*:*:*:*:*:*:*")),
+    Detector("Eclipse ThreadX NetX Duo", "Eclipse Foundation (formerly Azure RTOS)", "nx_api.h",
+             _join_defines("NETXDUO_MAJOR_VERSION", "NETXDUO_MINOR_VERSION", "NETXDUO_PATCH_VERSION"),
+             root_levels=3, license="MIT",
+             purl="pkg:github/eclipse-threadx/netxduo@v{v}",
+             cpe=("cpe:2.3:a:eclipse:threadx_netx_duo:{v}:*:*:*:*:*:*:*",
+                  "cpe:2.3:o:microsoft:azure_rtos_netx_duo:{v}:*:*:*:*:*:*:*")),
+    Detector("MCUboot", "MCUboot project (Linaro)", "VERSION", _mcuboot,
+             root_levels=3, license="Apache-2.0",
+             purl="pkg:github/mcu-tools/mcuboot@v{v}", path_hint="mcuboot"),
+    Detector("STM32 USB Device Library", "STMicroelectronics", "Release_Notes.html", _st_release_notes,
+             root_levels=1, license="SLA0044 / Apache-2.0 (see package)",
+             purl="pkg:github/STMicroelectronics/stm32-mw-usb-device@v{v}", path_hint="usb_device"),
+    Detector("STM32 USB Device Library", "STMicroelectronics", "Release_Notes.html", _st_release_notes,
+             root_levels=1, license="SLA0044 / Apache-2.0 (see package)",
+             purl="pkg:github/STMicroelectronics/stm32-mw-usb-device@v{v}", path_hint="usb-device"),
+    Detector("STM32 USB Host Library", "STMicroelectronics", "Release_Notes.html", _st_release_notes,
+             root_levels=1, license="SLA0044 / Apache-2.0 (see package)",
+             purl="pkg:github/STMicroelectronics/stm32-mw-usb-host@v{v}", path_hint="usb_host"),
+    Detector("STM32 USB Host Library", "STMicroelectronics", "Release_Notes.html", _st_release_notes,
+             root_levels=1, license="SLA0044 / Apache-2.0 (see package)",
+             purl="pkg:github/STMicroelectronics/stm32-mw-usb-host@v{v}", path_hint="usb-host"),
 ]
+
+
+def _cube_package_from_ioc(text):
+    """STM32CubeMX .ioc: 'ProjectManager.FirmwarePackage=STM32Cube FW_L4 V1.18.1' -> ('STM32Cube FW_L4', '1.18.1')."""
+    m = re.search(r"^ProjectManager\.FirmwarePackage=(STM32Cube FW_\w+) V(\d+\.\d+\.\d+)", text, re.M)
+    return (m.group(1), m.group(2)) if m else None
 
 
 def _stm32_hal_detectors():
@@ -184,6 +242,17 @@ def detect(root: str) -> List[Component]:
         candidates = list(by_marker.get(fname, []))
         if hal_re.match(fname):
             candidates.append(hal)
+        if fname.lower().endswith(".ioc"):
+            pkg = _cube_package_from_ioc(_read(os.path.join(dirpath, fname)))
+            if pkg:
+                family = pkg[0].split("_", 1)[1]  # e.g. "L4"
+                key = (pkg[0], pkg[1], os.path.normpath(dirpath))
+                found.setdefault(key, Component(
+                    name=pkg[0], version=pkg[1], supplier="STMicroelectronics", root=os.path.normpath(dirpath),
+                    license="See package", purl="pkg:github/STMicroelectronics/STM32Cube{}@v{}".format(family, pkg[1]),
+                    linkable=False,
+                    evidence=[os.path.relpath(os.path.join(dirpath, fname), root).replace("\\", "/")]))
+            continue
         if not candidates:
             continue
         text = None

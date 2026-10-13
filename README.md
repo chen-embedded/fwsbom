@@ -47,8 +47,13 @@ Install Grype with **`winget install Anchore.Grype`**, then open a new terminal.
 
 ## Detected components
 
-FreeRTOS-Kernel · Mbed TLS (2.x/3.x/4.x) · lwIP · FatFs · littlefs · wolfSSL · TinyUSB ·
-cJSON · nanopb · CMSIS-Core · STM32Cube HAL drivers (all families)
+**RTOS:** FreeRTOS-Kernel · Eclipse ThreadX (Azure RTOS)
+**Networking / IoT:** lwIP · FreeRTOS-Plus-TCP · NetX Duo · coreMQTT · Mbed TLS (2.x/3.x/4.x) · wolfSSL
+**Boot:** MCUboot
+**USB:** TinyUSB · STM32 USB Device / Host libraries
+**Storage / data:** FatFs · littlefs · cJSON · nanopb
+**Vendor:** CMSIS-Core · STM32Cube HAL drivers (all families) · **STM32Cube firmware package version from
+the CubeMX `.ioc` file** (e.g. `STM32Cube FW_L4 1.18.1`)
 
 The `LINKED` column means:
 - `yes`: at least one of the component's sources ended up in the image

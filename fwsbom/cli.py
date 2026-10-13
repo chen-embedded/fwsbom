@@ -29,7 +29,7 @@ def main(argv=None):
     if args.map:
         objs = mapfile.linked_objects(args.map)
         for c in comps:
-            c.linked = mapfile.is_linked(c.root, objs)
+            c.linked = mapfile.is_linked(c.root, objs) if c.linkable else None
         if args.linked_only:
             comps = [c for c in comps if c.linked is not False]
 

@@ -25,6 +25,19 @@ FILES = {
         "#define __STM32F4xx_HAL_VERSION_SUB1   (0x08U)\n"
         "#define __STM32F4xx_HAL_VERSION_SUB2   (0x03U)\n",
     "Core/Src/main.c": "",
+    "Middlewares/Third_Party/FreeRTOS-Plus-TCP/source/include/FreeRTOS_IP.h":
+        '#define ipFR_TCP_VERSION_NUMBER    "V4.4.1"\n',
+    "Middlewares/coreMQTT/source/include/core_mqtt.h": '#define MQTT_LIBRARY_VERSION    "v5.0.2"\n',
+    "Middlewares/threadx/common/inc/tx_api.h":
+        "#define THREADX_MAJOR_VERSION 6\n#define THREADX_MINOR_VERSION 5\n#define THREADX_PATCH_VERSION 2\n",
+    "Middlewares/netxduo/common/inc/nx_api.h":
+        "#define NETXDUO_MAJOR_VERSION 6\n#define NETXDUO_MINOR_VERSION 4\n#define NETXDUO_PATCH_VERSION 1\n",
+    "Bootloader/mcuboot/boot/zephyr/VERSION":
+        "VERSION_MAJOR = 2\nVERSION_MINOR = 1\nPATCHLEVEL = 0\nVERSION_TWEAK = 0\nEXTRAVERSION =\n",
+    "Bootloader/mcuboot/ext/tinycrypt/VERSION": "0.2.8\n",  # must not be mistaken for MCUboot
+    "Middlewares/ST/STM32_USB_Device_Library/Release_Notes.html":
+        "<h2>Update history</h2><p>V2.11.3 / 07-June-2024</p><p>V2.11.2 / 2023</p>",
+    "demo.ioc": "MxCube.Version=6.14.0\nProjectManager.FirmwarePackage=STM32Cube FW_F4 V1.28.1\n",
     # Unrelated version.h must not be mistaken for Mbed TLS / wolfSSL
     "Core/Inc/version.h": '#define MBEDTLS_VERSION_STRING "9.9.9"\n',
 }
@@ -75,6 +88,13 @@ class FwsbomTest(unittest.TestCase):
             "littlefs": "2.9",
             "CMSIS-Core": "5.6",
             "STM32F4xx HAL Driver": "1.8.3",
+            "FreeRTOS-Plus-TCP": "4.4.1",
+            "coreMQTT": "5.0.2",
+            "Eclipse ThreadX": "6.5.2",
+            "Eclipse ThreadX NetX Duo": "6.4.1",
+            "MCUboot": "2.1.0",
+            "STM32 USB Device Library": "2.11.3",
+            "STM32Cube FW_F4": "1.28.1",
         })
 
     def test_component_roots(self):
@@ -94,6 +114,10 @@ class FwsbomTest(unittest.TestCase):
         self.assertFalse(linked["littlefs"])
         self.assertFalse(linked["FatFs"])
         self.assertIsNone(linked["CMSIS-Core"])  # header-only
+        comps = {c.name: c for c in detectors.detect(self.root)}
+        self.assertFalse(comps["STM32Cube FW_F4"].linkable)  # SDK package from .ioc: never "linked"
+        self.assertEqual(comps["STM32Cube FW_F4"].purl, "pkg:github/STMicroelectronics/STM32CubeF4@v1.28.1")
+        self.assertEqual(comps["Eclipse ThreadX"].cpes[0], "cpe:2.3:a:eclipse:threadx:6.5.2:*:*:*:*:*:*:*")
 
     def test_cli_emits_cyclonedx(self):
         out = os.path.join(self.root, "sbom.json")
