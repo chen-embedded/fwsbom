@@ -36,7 +36,7 @@ CPEs are checked against the NVD product dictionary. Products filed under severa
 ## Install
 
 ```
-pip install git+https://github.com/chen-embedded/fwsbom   # PyPI release coming soon
+pip install fwsbom
 ```
 
 Requires Python 3.8+ and has no dependencies.
