@@ -1,14 +1,51 @@
 name: test
 on: [push, pull_request]
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned images: GitHub's "-latest" labels move and drop old Pythons without warning.
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        python: ["3.10", "3.13"]  # oldest available on ubuntu runners; 3.9 verified locally
+        os: [ubuntu-24.04, windows-2025]
+        python: ["3.10", "3.13"]  # 3.9 is verified locally; runners no longer ship it
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - run: python -m unittest discover -s tests -v
+      - name: Installed entry point works
+        run: |
+          python -m pip install .
+          fwsbom -V
+          python -m fwsbom -V
+
+  action:
+    # Exercises action.yml the way customers use it in their CI.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create a small firmware tree
+        run: |
+          mkdir -p demo/FreeRTOS/include demo/mbedtls/include/mbedtls
+          echo '#define tskKERNEL_VERSION_NUMBER "V10.6.2"' > demo/FreeRTOS/include/task.h
+          echo '#define MBEDTLS_VERSION_STRING "3.6.2"' > demo/mbedtls/include/mbedtls/build_info.h
+      - uses: ./
+        with:
+          root: demo
+          name: action-test
+          version: "1.0.0"
+          supplier: Chen Embedded Software LLC
+          output: sbom.cdx.json
+      - name: Check the SBOM
+        run: |
+          python - <<'PY'
+          import json
+          bom = json.load(open("sbom.cdx.json"))
+          names = {c["name"]: c["version"] for c in bom["components"]}
+          assert names == {"FreeRTOS-Kernel": "10.6.2", "Mbed TLS": "3.6.2"}, names
+          assert bom["metadata"]["component"]["name"] == "action-test"
+          print("action OK:", names)
+          PY

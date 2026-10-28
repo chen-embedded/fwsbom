@@ -22,6 +22,12 @@ inputs:
   output:
     description: SBOM output path
     default: sbom.cdx.json
+  scan:
+    description: "Also look up known vulnerabilities in the NVD (true/false). Set an NVD_API_KEY env var to go faster"
+    default: "false"
+  fail-on:
+    description: "With scan: fail the step on findings at/above critical|high|medium|low, or 'exploited'"
+    default: ""
 runs:
   using: composite
   steps:
@@ -34,4 +40,6 @@ runs:
         args=("${{ inputs.root }}" --name "${{ inputs.name }}" --version "${{ inputs.version }}" \
               --supplier "${{ inputs.supplier }}" -o "${{ inputs.output }}")
         if [ -n "${{ inputs.map }}" ]; then args+=(--map "${{ inputs.map }}" --linked-only); fi
+        if [ "${{ inputs.scan }}" = "true" ]; then args+=(--scan); fi
+        if [ -n "${{ inputs.fail-on }}" ]; then args+=(--fail-on "${{ inputs.fail-on }}"); fi
         fwsbom "${args[@]}"

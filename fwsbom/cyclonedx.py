@@ -32,7 +32,24 @@ def render(components: List[Component], product: str, product_version: str, supp
             entry["properties"].append({"name": "fwsbom:linked", "value": str(c.linked).lower()})
         comps.append(entry)
 
-    return {
+    vulns = []
+    for c, entry in zip(components, comps):
+        for v in getattr(c, "vulns", None) or []:
+            item = {
+                "id": v.id,
+                "source": {"name": "NVD", "url": "https://nvd.nist.gov/vuln/detail/" + v.id},
+                "ratings": [{"severity": v.severity.lower() if v.severity != "UNKNOWN" else "unknown",
+                             **({"score": v.score} if v.score is not None else {})}],
+                "description": v.description[:1000],
+                "affects": [{"ref": entry["bom-ref"]}],
+            }
+            if v.fixed_in:
+                item["recommendation"] = "Upgrade to {} or later.".format(" / ".join(v.fixed_in))
+            if v.exploited:
+                item["properties"] = [{"name": "fwsbom:cisa-kev", "value": "true"}]
+            vulns.append(item)
+
+    bom = {
         "bomFormat": "CycloneDX",
         "specVersion": "1.5",
         "serialNumber": "urn:uuid:{}".format(uuid.uuid4()),
@@ -47,3 +64,6 @@ def render(components: List[Component], product: str, product_version: str, supp
         "components": comps,
         "dependencies": [{"ref": "root-firmware", "dependsOn": [c["bom-ref"] for c in comps]}],
     }
+    if vulns:
+        bom["vulnerabilities"] = vulns
+    return bom

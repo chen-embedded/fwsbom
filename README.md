@@ -1,5 +1,7 @@
 # fwsbom
 
+[![test](https://github.com/chen-embedded/fwsbom/actions/workflows/test.yml/badge.svg)](https://github.com/chen-embedded/fwsbom/actions/workflows/test.yml) [![PyPI](https://img.shields.io/pypi/v/fwsbom)](https://pypi.org/project/fwsbom/)
+
 **SBOMs for bare-metal and RTOS firmware: the projects other SBOM tools miss.**
 
 Syft, Trivy and most SBOM generators look for package-manager lockfiles. A typical
@@ -33,13 +35,36 @@ $ fwsbom . -o sbom.cdx.json && grype sbom:sbom.cdx.json
 CPEs are checked against the NVD product dictionary. Products filed under several vendors
 (e.g. Mbed TLS: `arm` and `trustedfirmware`) get all of their CPEs, so matches are not lost to vendor naming.
 
+## Check for known vulnerabilities in one step: `--scan`
+
+```
+$ fwsbom . --map build/app.map --linked-only --scan
+COMPONENT                    VERSION        LINKED  KNOWN VULNERABILITIES
+cJSON                        1.7.12         yes     5 (1 critical, 2 high, 1 medium, 1 low); fixed versions include 1.7.18
+FatFs                        R0.12          yes     6 (3 high, 3 medium); fixed versions include r0.16
+FreeRTOS-Kernel              10.0.1         yes     6 (4 critical, 2 high); fixed versions include 10.4.3, 10.6.2, 11.3.1
+littlefs                     2.9            no      (not linked into the image, not checked)
+Mbed TLS                     2.16.0         yes     39 (4 critical, 13 high, 22 medium); fixed versions include 3.6.4, 3.6.5, 3.6.6
+```
+
+`--scan` looks up each component in the [NVD](https://nvd.nist.gov/) (no extra install) and
+**only checks code that is actually linked into the image**, so libraries the linker dropped
+don't produce false alarms. Findings are added to the SBOM's CycloneDX `vulnerabilities`
+section, and CVEs in CISA's Known Exploited Vulnerabilities catalog are flagged.
+
+- `--fail-on critical|high|medium|low|exploited` exits with code 1, to fail a CI build.
+- Without an API key NVD allows ~5 requests per 30 s (about 7 s per component). A free
+  [NVD API key](https://nvd.nist.gov/developers/request-an-api-key) in `NVD_API_KEY` makes it ~10x faster.
+- A listed vulnerability means the *version* is affected according to NVD. Whether your product
+  is exploitable depends on configuration and use: triage before acting.
+
 ## Install
 
 ```
 pip install fwsbom
 ```
 
-Requires Python 3.9+ and has no dependencies.
+Requires Python 3.9+ (tested on Linux and Windows) and has no dependencies.
 
 **Windows:** if `fwsbom` is "not recognized" after installing (common with the Microsoft Store Python,
 whose scripts folder isn't on PATH), run it as **`python -m fwsbom ...`**. It's the same tool.
