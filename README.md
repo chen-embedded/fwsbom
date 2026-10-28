@@ -39,7 +39,7 @@ CPEs are checked against the NVD product dictionary. Products filed under severa
 pip install fwsbom
 ```
 
-Requires Python 3.8+ and has no dependencies.
+Requires Python 3.9+ and has no dependencies.
 
 **Windows:** if `fwsbom` is "not recognized" after installing (common with the Microsoft Store Python,
 whose scripts folder isn't on PATH), run it as **`python -m fwsbom ...`**. It's the same tool.
