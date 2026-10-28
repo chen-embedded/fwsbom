@@ -1,3 +1,5 @@
+# Copyright 2026 Chen Embedded Software LLC
+# SPDX-License-Identifier: Apache-2.0
 """Use a GNU ld / arm-none-eabi linker map file to tell which components actually ship.
 
 Source scanning alone over-reports: a vendored library sitting in the tree may never

@@ -1,3 +1,5 @@
+# Copyright 2026 Chen Embedded Software LLC
+# SPDX-License-Identifier: Apache-2.0
 """Detect vendored third-party components in a C/C++ firmware source tree.
 
 Each detector names a "marker" file that identifies the component and a list of

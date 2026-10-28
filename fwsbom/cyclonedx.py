@@ -1,3 +1,5 @@
+# Copyright 2026 Chen Embedded Software LLC
+# SPDX-License-Identifier: Apache-2.0
 """Render detected components as a CycloneDX 1.5 JSON SBOM."""
 import datetime
 import uuid

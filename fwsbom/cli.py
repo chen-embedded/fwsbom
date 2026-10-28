@@ -1,3 +1,5 @@
+# Copyright 2026 Chen Embedded Software LLC
+# SPDX-License-Identifier: Apache-2.0
 """fwsbom command line: scan a firmware tree, optionally confirm linkage, emit CycloneDX."""
 import argparse
 import json

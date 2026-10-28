@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fwsbom"
-version = "0.3.0"
+version = "0.3.1"
 description = "CycloneDX SBOMs for bare-metal and RTOS C firmware, verified against the linker map"
 readme = "README.md"
 requires-python = ">=3.8"
